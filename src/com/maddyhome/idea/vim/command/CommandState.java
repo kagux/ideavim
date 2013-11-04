@@ -30,6 +30,8 @@ import com.maddyhome.idea.vim.option.Options;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 
 /**
@@ -159,6 +161,17 @@ public class CommandState {
     updateStatus();
   }
 
+  public static void addCommandStateChangeListener(CommandStateChangeListener listener) {
+    listeners.add(listener);
+  }
+
+  private void fireStateChangedEvent() {
+    CommandStateChangeEvent event = new CommandStateChangeEvent(this);
+    for (CommandStateChangeListener listener : listeners) {
+      listener.commandStateChange(event);
+    }
+  }
+
   private void updateStatus() {
     StringBuffer msg = new StringBuffer();
     if (Options.getInstance().isSet("showmode")) {
@@ -172,6 +185,7 @@ public class CommandState {
       msg.append("recording");
     }
 
+    fireStateChangedEvent();
     VimPlugin.showMode(msg.toString());
   }
 
@@ -399,5 +413,6 @@ public class CommandState {
   private static char lastRegister = RegisterGroup.REGISTER_DEFAULT;
 
   private static Logger logger = Logger.getInstance(CommandState.class.getName());
+  @NotNull private static List<CommandStateChangeListener> listeners = new ArrayList<CommandStateChangeListener>();
 }
 

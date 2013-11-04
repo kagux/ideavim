@@ -20,6 +20,11 @@ package com.maddyhome.idea.vim;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.DataContext;
+import com.intellij.openapi.actionSystem.ex.AnActionListener;
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
@@ -39,24 +44,31 @@ import com.intellij.openapi.editor.event.EditorFactoryAdapter;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
+import com.intellij.openapi.keymap.KeymapManager;
+import com.intellij.openapi.keymap.impl.KeymapManagerImpl;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.project.ProjectManagerAdapter;
+import com.intellij.openapi.startup.StartupManager;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.wm.StatusBar;
 import com.intellij.openapi.wm.WindowManager;
+import com.maddyhome.idea.vim.action.key.LeaderAction;
 import com.maddyhome.idea.vim.command.CommandState;
 import com.maddyhome.idea.vim.ex.CommandParser;
 import com.maddyhome.idea.vim.group.*;
 import com.maddyhome.idea.vim.helper.*;
 import com.maddyhome.idea.vim.option.Options;
+import org.apache.log4j.Level;
 import org.jdom.Element;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.*;
+import java.util.List;
 
 /**
  * This plugin attempts to emulate the key binding and general functionality of Vim and gVim. See the supplied
@@ -110,6 +122,7 @@ public class VimPlugin implements ApplicationComponent, PersistentStateComponent
    */
   public VimPlugin(final Application app) {
     myApp = app;
+    LOG.setLevel(Level.ALL);
     LOG.debug("VimPlugin ctr");
   }
 
@@ -149,8 +162,33 @@ public class VimPlugin implements ApplicationComponent, PersistentStateComponent
       }
     });
 
+
+    ProjectManager.getInstance().addProjectManagerListener(new ProjectManagerAdapter() {
+      @Override
+      public void projectOpened(Project project) {
+        StartupManager.getInstance(project).registerPostStartupActivity(new Runnable() {
+          @Override
+          public void run() {
+            ActionManager actionManager = ActionManager.getInstance();
+            //get actions bind to ','
+            String[] leaderActionIds = KeymapManager.getInstance().getActiveKeymap().getActionIds(KeyStroke.getKeyStroke(44, 0));
+            for (String id : leaderActionIds){
+              AnAction anAction = actionManager.getAction(id);
+              actionManager.unregisterAction(id);
+              LeaderAction leaderAction = new LeaderAction(anAction);
+              CommandState.addCommandStateChangeListener(leaderAction);
+              actionManager.registerAction(id, leaderAction);
+            }
+          }
+        });
+      }
+    });
+
+
     EditorActionManager manager = EditorActionManager.getInstance();
     TypedAction action = manager.getTypedAction();
+
+
 
     // Replace the default key handler with the Vim key handler
     vimHandler = new VimTypedActionHandler(action.getHandler());
